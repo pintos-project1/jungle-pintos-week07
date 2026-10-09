@@ -11,8 +11,8 @@
    * 이번 도커 환경은 ubuntu 22.04를 지원하여 vscode의 최신 버전에서 원격 연결이 안되는 문제를 해결하였습니다.
 * pintos 도커 환경은 kaist-pintos에서 추천하는 qemu 에뮬레이터를 설치하고 사용합니다. 
 * pintos 도커 환경은 9주차부터 13주차까지 같은 환경을 사용합니다. 이 기간동안 별도의 개발 환경을 제공하지 않습니다.
-* 기존 도커 환경과 달리 `vscode`와 통합된 디버깅 환경(F5로 시작하는)을 제공하지 않습니다. 디버깅이 필요한 경우 `gdb`를 사용하세요. 
-* vscode에서 터미널을 오픈하면 자동으로 `source /workspaces/pintos_22.04_lab_docker/pintos/activate`를 실행합니다.
+* VS Code에서 F5를 누르면 자동 빌드 후 QEMU/GDB 디버깅을 시작합니다.
+* 컨테이너의 PATH에 현재 작업 폴더의 `pintos/utils`가 자동 추가됩니다.
 
 ---
 
@@ -100,7 +100,25 @@ pintos_22.04_lab_docker/
 ---
 
 ## 7. C 파일에 브레이크포인트 설정 후 디버깅 (F5)
-pintos 랩에서는 vscode기반의 디버깅을 지원하지 않습니다. 
+1. 설정 변경 후 명령 팔레트에서 `Dev Containers: Rebuild and Reopen in Container`를 실행합니다.
+2. `pintos/threads/init.c`의 `main()` 또는 디버깅할 C 코드에 브레이크포인트를 설정합니다.
+3. 실행 및 디버그에서 **Pintos: F5 debug**를 선택하고 **F5**를 누릅니다.
+4. 자동 빌드와 GDB 연결 후 커널 `main()`에 멈춥니다. F5로 계속 실행하고 F10/F11로 코드를 따라갈 수 있습니다.
+
+커널 출력은 **디버그 콘솔**에 표시됩니다. Shift+F5로 종료하면 이 세션의 QEMU도 정리됩니다. QEMU는 부팅 전에 정지하므로 중단점은 하드웨어 중단점을 사용합니다(최대 4개, 부팅 중에는 자동 `main()` 중단점이 1개 사용). GDB 연결은 컨테이너 내부의 1234 포트를 사용하며, 디버깅 세션은 하나씩 실행하세요.
+
+기본 실행은 `alarm-single`입니다. 다른 테스트를 디버깅하려면 `.vscode/settings.json`의 `pintos.args`를 변경하세요.
+
+기본 빌드 대상은 `threads`입니다. `.vscode/settings.json`의 `pintos.project`를 `userprog`, `vm`, `filesys`로 바꾸면 빌드 경로와 디버깅 대상이 함께 바뀝니다. 사용자 프로그램은 먼저 해당 프로젝트의 테스트를 빌드하고, `pintos.args`에 파일 복사와 파일시스템 옵션도 지정하세요. 예:
+
+```text
+--fs-disk=10 -p tests/userprog/args-none:args-none -- -q -f run args-none
+```
+
+이 구성은 커널 디버깅용입니다. 사용자 프로그램 소스의 중단점에는 해당 실행 파일의 심볼을 별도로 불러와야 합니다.
+
+설정 파일: `.vscode/launch.json`(GDB 연결), `.vscode/tasks.json`(빌드), `.devcontainer/debug.py`(QEMU 실행 및 종료).
+VS Code 설정 항목은 [공식 C/C++ 디버깅 문서](https://code.visualstudio.com/docs/cpp/launch-json-reference)를 참고하세요.
 
 ---
 ## 8. 새로운 Git 리포지토리에 Commit & Push 하기

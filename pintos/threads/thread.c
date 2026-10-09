@@ -535,6 +535,7 @@ do_schedule(int status) {
 		palloc_free_page(victim);
 	}
 	thread_current ()->status = status;
+	// printf("%d thread current \n",thread_current ()->status );
 	schedule ();
 }
 
