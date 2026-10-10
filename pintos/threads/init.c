@@ -125,7 +125,7 @@ main (void) {
 	if (power_off_when_done)
 		power_off ();
 	thread_exit ();
-}
+} 
 
 /* Clear BSS */
 static void

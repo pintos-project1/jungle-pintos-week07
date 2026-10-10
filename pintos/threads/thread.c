@@ -28,6 +28,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+// Sleep list 
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -105,10 +108,11 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -306,6 +310,23 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+void
+thread_sleep(int64_t sleep_tick) {
+	// 현재 running 중인 스레드 선택
+	struct thread *curr = thread_current ();
+	// interrup blocker
+	enum intr_level old_level;
+	old_level = intr_disable ();
+
+	if (curr != idle_thread){
+		list_push_back (&sleep_list, &curr->elem);
+	}
+	curr->sleep_tick = sleep_tick;
+	thread_block();
+
+
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */

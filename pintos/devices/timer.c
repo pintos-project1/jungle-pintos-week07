@@ -90,11 +90,14 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
+	
 	int64_t start = timer_ticks ();
-
+	
 	ASSERT (intr_get_level () == INTR_ON);
+	// alram clock 설정 -> ticks 만큼 스레드 재우기.
+	// timer_elapsed -> 이전 시간에서 얼만큼 시간이 지났는지
 	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+		thread_sleep (ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
