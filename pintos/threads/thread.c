@@ -315,34 +315,36 @@ thread_yield (void) {
 void
 thread_sleep(int64_t sleep_tick) {
 	// 현재 running 중인 스레드 선택
-	struct thread *curr = thread_current ();
+	struct thread *curr = thread_current();
 	// interrup blocker
 	enum intr_level old_level;
-	old_level = intr_disable ();
-
+	old_level = intr_disable();
+	list_less_func *fp = node_cmp;
 	if (curr != idle_thread){
-		list_push_back (&sleep_list, &curr->elem);
+		// list_push_back (&sleep_list, &curr->elem);
+		// 삽입 정렬
+		curr->sleep_tick = sleep_tick;
+		list_insert_ordered(&sleep_list, &curr->elem, fp, NULL );
+		
 	}
-	curr->sleep_tick = sleep_tick;
+	
 	thread_block();
-	intr_set_level (old_level);
+	intr_set_level(old_level);
 
 
 }
 
-int 
+void
 thread_awake(int64_t awake_tick) {
 	
-	// sleep list 가 비어있으면? 
+	// sleep list 가 비어있으면? if (list_empty(&sleep_list)) return 0;
 	
-	if (list_empty(&sleep_list)) return 0;
 	struct thread *temp;
-	struct list_elem *st = list_head(&sleep_list);
-	struct list_elem *tt = list_next(st);
-
-	do {
+	struct list_elem *tt = list_begin(&sleep_list);
+	// tail 이 항상 	
+	while (tt != list_end(&sleep_list)){
 		temp = list_entry(tt, struct thread, elem);
-		// sleep list 에서 ready list로 옮겨주기.. 
+		// sleep list 에서 ready list로 옮겨주기
 		if (temp->sleep_tick <= awake_tick){
 			tt = list_remove(tt);
 			thread_unblock(temp);
@@ -350,18 +352,18 @@ thread_awake(int64_t awake_tick) {
 		else {
 			tt = list_next(tt);
 		}
-	} while (tt != list_end(&sleep_list));
-
-	return 1;
-	/*
-	while (!list_empty (&destruction_req)) {
-		struct thread *victim =
-			list_entry (list_pop_front (&destruction_req), struct thread, elem);
-		palloc_free_page(victim);
-	} */
+	};
 
 }
- 
+
+bool 
+node_cmp(const struct list_elem *a,const struct list_elem *b, void *aux ){
+	struct thread *v1 = list_entry(a, struct thread, elem);
+	struct thread *v2 = list_entry(b, struct thread, elem);
+	// ascending sort 
+	return v1->sleep_tick < v2->sleep_tick ; 
+}
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
