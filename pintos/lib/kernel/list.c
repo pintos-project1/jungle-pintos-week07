@@ -237,6 +237,7 @@ struct list_elem *e = list_pop_front (&list);
 ...do something with e...
 }
 */
+// 특정 요소 제거 -> 특정 스레드를 리스트에서 제거
 struct list_elem *
 list_remove (struct list_elem *elem) {
 	ASSERT (is_interior (elem));
@@ -246,7 +247,9 @@ list_remove (struct list_elem *elem) {
 }
 
 /* Removes the front element from LIST and returns it.
-   Undefined behavior if LIST is empty before removal. */
+   Undefined behavior if LIST is empty before removal. 
+   맨 앞 요소를 꺼내면서 제거 
+   -> 꺠울 스레드를 리스트에서 제거*/
 struct list_elem *
 list_pop_front (struct list *list) {
 	struct list_elem *front = list_front (list);
@@ -264,7 +267,9 @@ list_pop_back (struct list *list) {
 }
 
 /* Returns the front element in LIST.
-   Undefined behavior if LIST is empty. */
+   Undefined behavior if LIST is empty. 
+   맨 앞 요소 확인
+   -> 가장 먼저 깨울 스레드 확인*/
 struct list_elem *
 list_front (struct list *list) {
 	ASSERT (!list_empty (list));
@@ -291,7 +296,9 @@ list_size (struct list *list) {
 	return cnt;
 }
 
-/* Returns true if LIST is empty, false otherwise. */
+/* Returns true if LIST is empty, false otherwise. 
+리스트가 비었는지 확인
+-> 깨울 스레드가 있는지 확인*/
 bool
 list_empty (struct list *list) {
 	return list_begin (list) == list_end (list);
@@ -414,7 +421,9 @@ list_sort (struct list *list, list_less_func *less, void *aux) {
 
 /* Inserts ELEM in the proper position in LIST, which must be
    sorted according to LESS given auxiliary data AUX.
-   Runs in O(n) average case in the number of elements in LIST. */
+   Runs in O(n) average case in the number of elements in LIST. 
+   조건에 맞는 위치에 삽입
+   -> 깨울 순서로 스레드 등록*/
 void
 list_insert_ordered (struct list *list, struct list_elem *elem,
 		list_less_func *less, void *aux) {

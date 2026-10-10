@@ -17,18 +17,20 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+//sleep_list 선언
+static struct list sleep_list;
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
-
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
-
+static bool wakeup_tick_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -43,6 +45,10 @@ timer_init (void) {
 	outb (0x40, count >> 8);
 
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+	
+	//수면리스트 초기화
+	list_init (&sleep_list);
+	
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -87,15 +93,35 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
+//비교 함수 프로토타입
+static bool
+wakeup_tick_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	struct thread *ta = list_entry (a, struct thread, elem);
+	struct thread *tb = list_entry (b, struct thread, elem);
+	return ta->wakeup_tick < tb->wakeup_tick;
+}
+
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+	struct thread *current=thread_current();
 
+	int64_t start = timer_ticks (); //시작 시점의 타이머 틱 기록
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	
+	if (ticks<=0){
+		return;
+	}
+
+	enum intr_level old_level = intr_disable ();//old_level에 기존 인터럽트 상태 끄면서 보관
+
+	current->wakeup_tick = start + ticks; //깨어나는 시각 기록
+	list_insert_ordered(&sleep_list,&current->elem,wakeup_tick_less,NULL); //슬립 리스트에 넣기 
+	thread_block(); //스레드 블락으로 상태 변경 -> 스케줄러로 제어 넘어감
+
+	intr_set_level (old_level); //원래 인터럽트 상태 복원
 }
+
 
 /* Suspends execution for approximately MS milliseconds. */
 void
@@ -124,8 +150,17 @@ timer_print_stats (void) {
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
-	thread_tick ();
+	ticks++; //OS가 기록하는 타이머 틱 수를 1증가시킴
+	thread_tick (); //현재 실행중인 스레드의 실행시간 기록, 필요한 경우 선점 스케줄링 요청
+	
+	while (!list_empty (&sleep_list)){
+		struct thread *t = list_entry (list_front (&sleep_list), struct thread, elem);
+		if(t->wakeup_tick>ticks)
+			break;
+
+		list_remove(&t->elem);
+		thread_unblock(t);
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
