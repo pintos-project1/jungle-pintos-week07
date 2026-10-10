@@ -63,6 +63,9 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+//슬립 리스트 정의
+struct list sleep_list;
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -109,6 +112,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -119,6 +123,56 @@ thread_init (void) {
 
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
+
+
+   //핀토스 정령 함수 list_insert_ordered를 사용하기 위해 3개의 인자를 받음(a, b, aux)
+static bool
+wakeup_tick_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+    struct thread *thread_a = list_entry (a, struct thread, elem);
+    struct thread *thread_b = list_entry (b, struct thread, elem);
+
+    //1차 : wakeup_tick이 더 빠른스레드가 앞에 옴(오름차순)
+	//a,b wakeup_tick 비교 - wakeup_tick이 다르면 둘 중 누가 앞에오는지 비교 - 작은 값이(빨리 일어나는 쪽)이 앞에 배치
+    if (thread_a->wakeup_tick != thread_b->wakeup_tick) {
+        return thread_a->wakeup_tick < thread_b->wakeup_tick;
+    }
+
+    //2차 : wakeup_tick이 같으면, 우선순위가 더 높은 스레드가 앞으로 오도록 내림차순 정렬
+    return thread_a->priority > thread_b->priority;
+}
+
+   //현재 스레드를 지정된 틱까지 재움
+void
+thread_sleep (int64_t ticks) {
+    struct thread *cur = thread_current ();
+    enum intr_level old_level = intr_disable ();	//인터럽트 차단
+
+    ASSERT (cur != idle_thread);
+
+    cur->wakeup_tick = ticks;
+    //뒤에 붙이지 않고, wakeup_tick_less 기준에 맞춰 정렬된 위치에 삽입
+    list_insert_ordered (&sleep_list, &cur->elem, wakeup_tick_less, NULL);
+    thread_block ();
+
+    intr_set_level (old_level);	//인터럽트 복구
+}
+
+// 타이머 틱마다 호출되어 시간이 된 스레드를 깨움
+void
+thread_awake (int64_t ticks) {
+    struct list_elem *e = list_begin (&sleep_list);
+    while (e != list_end (&sleep_list)) {
+        struct thread *t = list_entry (e, struct thread, elem);
+        struct list_elem *next = list_next (e);	//다음 노드 주소 저장
+
+        if (t->wakeup_tick <= ticks) {
+            list_remove (e);
+            thread_unblock (t);
+        }
+        e = next;
+    }
+}
+
 void
 thread_start (void) {
 	/* Create the idle thread. */
