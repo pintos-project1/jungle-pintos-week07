@@ -325,9 +325,43 @@ thread_sleep(int64_t sleep_tick) {
 	}
 	curr->sleep_tick = sleep_tick;
 	thread_block();
+	intr_set_level (old_level);
 
 
 }
+
+int 
+thread_awake(int64_t awake_tick) {
+	
+	// sleep list 가 비어있으면? 
+	
+	if (list_empty(&sleep_list)) return 0;
+	struct thread *temp;
+	struct list_elem *st = list_head(&sleep_list);
+	struct list_elem *tt = list_next(st);
+
+	do {
+		temp = list_entry(tt, struct thread, elem);
+		// sleep list 에서 ready list로 옮겨주기.. 
+		if (temp->sleep_tick <= awake_tick){
+			tt = list_remove(tt);
+			thread_unblock(temp);
+		}
+		else {
+			tt = list_next(tt);
+		}
+	} while (tt != list_end(&sleep_list));
+
+	return 1;
+	/*
+	while (!list_empty (&destruction_req)) {
+		struct thread *victim =
+			list_entry (list_pop_front (&destruction_req), struct thread, elem);
+		palloc_free_page(victim);
+	} */
+
+}
+ 
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
